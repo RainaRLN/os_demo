@@ -1,5 +1,8 @@
 [ORG 0x7c00]  ; MBR 被 BIOS 加载到 0x07C00 处
 
+[SECTION .data]
+SETUP_ADDR equ 0x500  ; setup 加载到内存中的地址
+
 [SECTION .text]
 [BITS 16]  ; 当前 CPU 处于实模式，为 16 位
 
@@ -22,11 +25,36 @@ _start:
     ; 调用 print
     ; 用 si 传字符串首地址
     xor si, si
-    mov si, msg
+    mov si, msg_load_setup
     call print
 
-    jmp $
+    ; 将 setup 读入内存
+    mov si, struct_buffer
+    mov ah, 0x42
+    mov dl, 0x80  ; 0x80 读第一块硬盘
+    int 0x13  ; BIOS int 13h/42h
+    jc .read_setup_failed
 
+    mov si, msg_jmp_to_setup
+    call print
+
+    xchg bx, bx
+
+    jmp SETUP_ADDR  ; 跳进 setup
+
+    jmp stop_cpu  ; 不应该返回
+
+.read_setup_failed:
+    mov si, msg_load_err
+    call print
+    jmp stop_cpu
+
+stop_cpu:
+    hlt
+    jmp stop_cpu
+
+; mov si, str  ; 将字符串首地址传给 si
+; call print  ; 调用 print
 print:
     mov ah, 0x0e  ; 显示一个字符，且光标移动
     mov bh, 0x00  ; 页号
@@ -42,8 +70,18 @@ print:
 .done:
     ret
 
-msg:
-    db "hello world", 10, 13, 0  ; \n \r \0
+msg_load_setup:
+    db "Start loading setup ...", 10, 13, 0  ; \n \r \0
+msg_load_err:
+    db "Read disk error!", 10, 13, 0
+msg_jmp_to_setup:
+    db "Jump to setup ...", 10, 13, 0
+
+struct_buffer:
+.struct_size: dw 0x10
+.sectors: dw 0x02  ; 读多少 sectors
+.addr: dd SETUP_ADDR  ; 要读入内存哪个地址
+.start_sector: dq 0x01  ; 从哪个 sector 开始读
 
 times 510 - ($ - $$) db 0  ; 补零
 db 0x55, 0xaa  ; MBR 结束标记
