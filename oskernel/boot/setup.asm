@@ -170,30 +170,40 @@ read_hd:
     mov al, 0x20  ; 请求读
     out dx, al
 
-    ; 不断查询 0x1f7，直到硬盘不忙且准备好数据传输
-.waits:
-    in al, dx
-    and al, 0x88  ; 保留 BSY 和 DRQ，其他位清零
-    cmp al, 0x08  ; BSY=0 不忙, DRQ=1 准备好数据传输
-    jnz .waits
-
     ; 开始通过 0x1f0 读数据
     movzx cx, bl  ; 读取多少扇区，将 bl 内容扩展到 cx 中，高位补零
-    shl cx, 8  ; 一个扇区 256 个字，一共要读 cx = cx * 256 个字
-    mov dx, 0x1f0
-.readw:
-    in ax, dx
-    mov [edi], ax
-    add edi, 2
-    loop .readw
+.start_read:
+    push cx  ; 后面会用到 cx，保存
+    call .waits
+    call .read_one_sector
+    pop cx  ; 恢复 loop 次数
+    loop .start_read
 
     ; 恢复寄存器
     pop edx
     pop ecx
     pop ebx
     pop eax
-
     ret  ; 返回
+
+    ; 不断查询 0x1f7，直到硬盘不忙且准备好数据传输
+.waits:
+    mov dx, 0x1f7
+    in al, dx
+    and al, 0x88  ; 保留 BSY 和 DRQ，其他位清零
+    cmp al, 0x08  ; BSY=0 不忙, DRQ=1 准备好数据传输
+    jnz .waits
+    ret
+
+.read_one_sector:
+    mov cx, 256  ; 一个扇区 256 个字
+    mov dx, 0x1f0
+.readw:
+    in ax, dx
+    mov [edi], ax
+    add edi, 2
+    loop .readw
+    ret
 
 msg_prepare_protected:
     db "Prepare to go into protected mode ...", 10, 13, 0  ; \n \r \0
