@@ -1,6 +1,8 @@
 [ORG 0x500]
 
 [SECTION .data]
+KERNEL_ADDR equ 0x1200
+
 SEG_BASE equ 0
 SEG_LIMIT equ 0xfffff
 
@@ -109,9 +111,89 @@ protected_start:
 
     xchg bx, bx
 
+    ; 将内核读入内存
+    ; 保护模式下无法使用 BIOS 中断
+    mov edi, KERNEL_ADDR  ; 读到内存哪个位置
+    mov ecx, 3  ; 从哪个扇区开始读
+    mov bl, 60  ; 读多少个扇区
+    call read_hd
+
+    ; 跳到内核
+    jmp CODE_SELECTOR:KERNEL_ADDR
+
 stop_cpu:
     hlt
     jmp stop_cpu
+
+read_hd:
+    ; 保存寄存器
+    push eax
+    push ebx
+    push ecx
+    push edx
+
+    ; 0x1f2 指定读取或写入的扇区数
+    mov dx, 0x1f2
+    mov al, bl
+    out dx, al
+
+    ; 0x1f3 LBA 地址 7:0
+    inc dx
+    mov al, cl
+    out dx, al
+
+    ; 0x1f4 LBA 地址 15:8
+    inc dx
+    mov al, ch
+    out dx, al
+
+    ; 0x1f5 LBA 地址 23:16
+    inc dx
+    shr ecx, 16
+    mov al, cl
+    out dx, al
+
+    ; 0x1f6
+    ; bit[3:0]: LBA 地址 27:24
+    ; bit[4]: 0->主盘, 1->从盘
+    ; bit[5] bit[7]: 固定为 1
+    ; bit[6]: 0->CHS模式, 1->LBA模式
+    inc dx
+    shr ecx, 8
+    and cl, 0x0f
+    mov al, 0b1110_0000
+    or al, cl
+    out dx, al
+
+    ; 0x1f7 控制/状态寄存器
+    inc dx
+    mov al, 0x20  ; 请求读
+    out dx, al
+
+    ; 不断查询 0x1f7，直到硬盘不忙且准备好数据传输
+.waits:
+    in al, dx
+    and al, 0x88  ; 保留 BSY 和 DRQ，其他位清零
+    cmp al, 0x08  ; BSY=0 不忙, DRQ=1 准备好数据传输
+    jnz .waits
+
+    ; 开始通过 0x1f0 读数据
+    movzx cx, bl  ; 读取多少扇区，将 bl 内容扩展到 cx 中，高位补零
+    shl cx, 8  ; 一个扇区 256 个字，一共要读 cx = cx * 256 个字
+    mov dx, 0x1f0
+.readw:
+    in ax, dx
+    mov [edi], ax
+    add edi, 2
+    loop .readw
+
+    ; 恢复寄存器
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
+
+    ret  ; 返回
 
 msg_prepare_protected:
     db "Prepare to go into protected mode ...", 10, 13, 0  ; \n \r \0
