@@ -27,7 +27,7 @@ ${BUILD}/system.bin: ${BUILD}/kernel.bin
 	nm ${BUILD}/kernel.bin | sort > ${BUILD}/system.map
 
 ${BUILD}/kernel.bin: ${BUILD}/boot/head.o ${BUILD}/init/main.o ${BUILD}/kernel/asm/io.o ${BUILD}/kernel/chr_drv/console.o \
-    ${BUILD}/lib/string.o ${BUILD}/kernel/vsprintf.o ${BUILD}/kernel/printk.o
+    ${BUILD}/lib/string.o ${BUILD}/kernel/vsprintf.o ${BUILD}/kernel/printk.o ${BUILD}/init/enter_x64.o
 	ld -m elf_i386 $^ -o $@ -Ttext 0x1200
 
 ${BUILD}/kernel/%.o: oskernel/kernel/%.c
@@ -46,7 +46,7 @@ ${BUILD}/kernel/asm/%.o: oskernel/kernel/asm/%.asm
 	$(shell mkdir -p ${BUILD}/kernel/asm)
 	nasm -f elf32 -g $< -o $@
 
-${BUILD}/init/main.o: oskernel/init/main.c
+${BUILD}/init/%.o: oskernel/init/%.c
 	$(shell mkdir -p ${BUILD}/init)
 	gcc ${CFLAGS} ${DEBUG} -c $< -o $@
 
@@ -64,13 +64,13 @@ bochs: all
 	bochs -q -f bochsrc
 
 qemug: all
-	qemu-system-i386 \
+	qemu-system-x86_64 \
 	-m 32M \
 	-boot d \
 	-hda ./build/hd.img -s -S
 
 qemu: all
-	qemu-system-i386 \
+	qemu-system-x86_64 \
 	-m 32M \
 	-boot d \
 	-hda ./build/hd.img
