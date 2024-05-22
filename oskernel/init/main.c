@@ -11,5 +11,7 @@ void kernel_main(void)
         printk("Unsupported CPU.\nEnd\n");
     }
 
+    enter_x64();
+
     while (1);
 }

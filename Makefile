@@ -12,7 +12,7 @@ CFLAGS+= -fno-stack-protector  # 不需要栈保护
 CFLAGS+=-Ioskernel/include
 CFLAGS:=$(strip ${CFLAGS})
 
-DEBUG:= -g
+DEBUG:= -g -DDEBUG
 
 
 all: ${BUILD}/boot/boot.o ${BUILD}/boot/setup.o ${BUILD}/system.bin
