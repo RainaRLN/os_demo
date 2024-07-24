@@ -1,5 +1,6 @@
 #include "enter_x64.h"
 #include "linux/kernel.h"
+#include "linux/gdt.h"
 #include "asm/system.h"
 #include "string.h"
 
@@ -256,6 +257,7 @@ void enter_x64(void)
 {
     BOCHS_DEBUG();
     init_ia32e_mode();
+    install_x64_descriptor();
     BOCHS_DEBUG();
 }
 
