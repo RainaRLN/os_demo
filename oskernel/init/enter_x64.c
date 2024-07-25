@@ -257,6 +257,11 @@ void enter_x64(void)
     BOCHS_DEBUG();
     init_ia32e_mode();
     install_x64_descriptor();
-    BOCHS_DEBUG();
+
+    __asm__ __volatile__(
+        "push 0x0018 \n\t"  // CS
+        "push 0x100000 \n\t"  // IP
+        "retf \n\t"  // 跳转到 x64
+    );
 }
 

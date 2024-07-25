@@ -2,6 +2,7 @@
 
 [SECTION .data]
 KERNEL_ADDR equ 0x1200
+X64_KERNEL_ADDR equ 0x100000
 
 SEG_BASE equ 0
 SEG_LIMIT equ 0xfffff
@@ -107,7 +108,7 @@ protected_start:
     mov fs, ax
     mov gs, ax
 
-    mov esp, 0x9fbff  ; 设置栈
+    mov esp, 0x7b00  ; 设置栈
 
     xchg bx, bx
 
@@ -115,7 +116,13 @@ protected_start:
     ; 保护模式下无法使用 BIOS 中断
     mov edi, KERNEL_ADDR  ; 读到内存哪个位置
     mov ecx, 3  ; 从哪个扇区开始读
-    mov bl, 60  ; 读多少个扇区
+    mov bl, 30  ; 读多少个扇区
+    call read_hd
+
+    ; 将 x64 内核读入内存
+    mov edi, X64_KERNEL_ADDR
+    mov ecx, 40
+    mov bl, 255
     call read_hd
 
     ; 跳到内核
