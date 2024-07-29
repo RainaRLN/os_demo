@@ -20,6 +20,7 @@ CFLAGS64 += -fno-pic  # 不需要位置无关的代码  position independent cod
 CFLAGS64 += -fno-pie  # 不需要位置无关的可执行程序 position independent executable
 CFLAGS64 += -nostdlib  # 不需要标准库
 CFLAGS64 += -fno-stack-protector  # 不需要栈保护
+CFLAGS64+=-Ix64/include
 
 DEBUG:= -g -DDEBUG
 
@@ -36,15 +37,34 @@ ${BUILD}/x64/system.bin: ${BUILD}/x64/kernel.bin
 	objcopy -O binary ${BUILD}/x64/kernel.bin ${BUILD}/x64/system.bin
 	nm ${BUILD}/x64/kernel.bin | sort > ${BUILD}/x64/system.map
 
-${BUILD}/x64/kernel.bin: ${BUILD}/x64/boot/head.o ${BUILD}/x64/init/main64.o
+${BUILD}/x64/kernel.bin: ${BUILD}/x64/boot/head.o ${BUILD}/x64/init/main64.o \
+	${BUILD}/x64/kernel/asm/printk.o ${BUILD}/x64/kernel/printk.o ${BUILD}/x64/kernel/vsprintf.o \
+	${BUILD}/x64/kernel/chr_drv/console.o ${BUILD}/x64/kernel/asm/io.o \
+	${BUILD}/x64/lib/string.o
 	ld -b elf64-x86-64 -o $@ $^ -Ttext 0x100000
 
 ${BUILD}/x64/boot/%.o: x64/boot/%.asm
 	$(shell mkdir -p ${BUILD}/x64/boot)
 	nasm -f elf64 ${DEBUG} $< -o $@
 
+${BUILD}/x64/kernel/asm/%.o: x64/kernel/asm/%.asm
+	$(shell mkdir -p ${BUILD}/x64/kernel/asm)
+	nasm -f elf64 ${DEBUG} $< -o $@
+
 ${BUILD}/x64/init/%.o: x64/init/%.c
 	$(shell mkdir -p ${BUILD}/x64/init)
+	gcc ${DEBUG} ${CFLAGS64} -c $< -o $@
+
+${BUILD}/x64/kernel/%.o: x64/kernel/%.c
+	$(shell mkdir -p ${BUILD}/x64/kernel)
+	gcc ${DEBUG} ${CFLAGS64} -c $< -o $@
+
+${BUILD}/x64/lib/%.o: x64/lib/%.c
+	$(shell mkdir -p ${BUILD}/x64/lib)
+	gcc ${DEBUG} ${CFLAGS64} -c $< -o $@
+
+${BUILD}/x64/kernel/chr_drv/%.o: x64/kernel/chr_drv/%.c
+	$(shell mkdir -p ${BUILD}/x64/kernel/chr_drv)
 	gcc ${DEBUG} ${CFLAGS64} -c $< -o $@
 
 ${BUILD}/system.bin: ${BUILD}/kernel.bin
