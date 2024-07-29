@@ -6,6 +6,7 @@ extern main_x64
 global _start
 _start:
     xchg bx, bx
+    xchg bx, bx
     call main_x64
     jmp $
 
