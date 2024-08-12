@@ -1,12 +1,19 @@
 #include "linux/kernel.h"
 
-static char *number(char *str, int num, char type)
+static char *number(char *str, int num, char type, int fill_zero)
 {
 
     char *p;
     char tmp_buf[36];
     unsigned int n;
     int base;
+
+    if (fill_zero) {
+        for (int i = 27; i < 35; ++i) {
+            tmp_buf[i] = '0';
+        }
+    }
+
     p = &tmp_buf[35];
     *p = '\0';
     switch (type) {
@@ -37,6 +44,12 @@ static char *number(char *str, int num, char type)
         } while (n /= base);
     }
 
+    if (fill_zero) {
+        if (p > &tmp_buf[35-fill_zero]) {
+            p = &tmp_buf[35-fill_zero];
+        }
+    }
+
     while (*p != '\0') {
         *str++ = *p++;
     }
@@ -47,6 +60,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 {
     char *str = buf;
     char *s;
+    int fill_zero = 0;
 
     while (*fmt) {
         if (*fmt != '%') {
@@ -54,6 +68,12 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             continue;
         }
         fmt++;
+
+        switch (*fmt) {
+        case '2'...'8':
+            fill_zero = *fmt - '0';
+            fmt++;
+        }
 
         switch (*fmt) {
         case 'c':
@@ -68,7 +88,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
         case 'd':
         case 'u':
         case 'x':
-            str = number(str, va_arg(args, unsigned int), *fmt);
+            str = number(str, va_arg(args, unsigned int), *fmt, fill_zero);
             break;
         default:
             *str++ = *fmt;

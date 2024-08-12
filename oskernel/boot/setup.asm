@@ -4,6 +4,10 @@
 KERNEL_ADDR equ 0x1200
 X64_KERNEL_ADDR equ 0x100000
 
+E820_ARDS_NUM dw 0
+E820_ARDS_NUM_ADDR equ 0x7e00
+E820_ARDS_ADDR equ 0x7e02
+
 SEG_BASE equ 0
 SEG_LIMIT equ 0xfffff
 
@@ -62,11 +66,39 @@ _start:
     mov fs, ax
     mov gs, ax
 
-    xor si, si
+get_mem_map:
+    xor ebx, ebx
+    mov di, E820_ARDS_ADDR
+.next:
+    mov eax, 0xe820  ; 子功能号
+    mov ecx, 20  ; ARDS 结构体大小
+    mov edx, 0x534d4150  ; MAGIC
+    int 0x15  ; BIOS 中断号
+
+    jc .get_map_err  ; CF = 1, 出错
+
+    inc dword [E820_ARDS_NUM]  ; 记录结构体数量
+    add di, cx  ; 下一个填充位置
+
+    cmp ebx, 0  ; ebx == 0, 表示是最后一个 ARDS 结构体，退出
+    jne .next  ; 继续下一个
+
+    mov ax, [E820_ARDS_NUM]
+    mov [E820_ARDS_NUM_ADDR], ax  ; 保存结构体总数
+
+    mov si, msg_get_mem_map_ok
+    call print
+    jmp enter_protected_mode
+
+.get_map_err:
+    mov si, msg_get_mem_map_err
+    call print
+    jmp $
+
+enter_protected_mode:
     mov si, msg_prepare_protected
     call print
 
-enter_protected_mode:
     cli  ; 关中断
 
     lgdt [gdt_ptr]  ; 加载 gdt 表
@@ -214,4 +246,7 @@ read_hd:
 
 msg_prepare_protected:
     db "Prepare to go into protected mode ...", 10, 13, 0  ; \n \r \0
-
+msg_get_mem_map_ok:
+    db "Query memory map ok.", 10, 13, 0
+msg_get_mem_map_err:
+    db "Query memory map failed.", 10, 13, 0
