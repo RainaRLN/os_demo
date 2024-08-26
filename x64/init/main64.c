@@ -2,6 +2,7 @@
 #include "linux/kernel.h"
 #include "linux/tty.h"
 #include "mm.h"
+#include "test/test.h"
 
 void main_x64(void)
 {
@@ -9,8 +10,12 @@ void main_x64(void)
 
     show_memory_map();
 
-    BOCHS_DEBUG();
+    phy_memory_init();
+
+    test_phymem_manage();
+
     while(1) {
-        __asm__ __volatile__("hlt");
+        HLT();
     }
 }
+

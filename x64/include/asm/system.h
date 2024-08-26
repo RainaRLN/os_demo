@@ -10,6 +10,7 @@
 #define BOCHS_DEBUG()
 #endif  // DEBUG
 
+#define HLT() __asm__ __volatile__("hlt":::"memory")
 
 #endif  // _ASM_SYSTEM_H_
 
