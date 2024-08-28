@@ -12,7 +12,7 @@ void main_x64(void)
 
     phy_memory_init();
 
-    test_phymem_manage();
+    test_vm_manage();
 
     while(1) {
         HLT();
