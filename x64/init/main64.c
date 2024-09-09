@@ -3,6 +3,7 @@
 #include "linux/tty.h"
 #include "mm.h"
 #include "test/test.h"
+#include "idt.h"
 
 void main_x64(void)
 {
@@ -12,7 +13,9 @@ void main_x64(void)
 
     phy_memory_init();
 
-    test_vm_manage();
+    idt_init();
+
+    test_div_err();
 
     while(1) {
         HLT();
