@@ -1,9 +1,17 @@
 #include "linux/kernel.h"
 #include "asm/system.h"
 #include "idt.h"
+#include "pic.h"
 
 static idt_item_t idt_table[256] = {0};
 static idtr_data_t idtr_data;
+
+extern void clock_handler_entry(void);
+void clock_interrupt_handler(void)
+{
+    printk("*");
+    send_eoi(0x20);
+}
 
 // 通用中断/异常处理入口
 void general_interrupt_handler(void)
@@ -43,6 +51,8 @@ void idt_init(void)
         // ist = 0;  // 不启用中断栈表
         install_idt_item(i, handler, 0x18, 0, 0);
     }
+
+    install_idt_item(0x20, &clock_handler_entry, 0x18, 0, 0);
 
     idtr_data.limit = sizeof(idt_table);
     idtr_data.base = (int64)&idt_table;

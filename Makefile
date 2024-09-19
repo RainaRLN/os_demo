@@ -41,7 +41,8 @@ ${BUILD}/x64/kernel.bin: ${BUILD}/x64/boot/head.o ${BUILD}/x64/init/main64.o \
 	${BUILD}/x64/kernel/asm/printk.o ${BUILD}/x64/kernel/printk.o ${BUILD}/x64/kernel/vsprintf.o \
 	${BUILD}/x64/kernel/chr_drv/console.o ${BUILD}/x64/kernel/asm/io.o \
 	${BUILD}/x64/lib/string.o ${BUILD}/x64/mm/mm.o ${BUILD}/x64/kernel/bitmap.o \
-	${BUILD}/x64/mm/malloc.o ${BUILD}/x64/kernel/idt.o\
+	${BUILD}/x64/mm/malloc.o ${BUILD}/x64/kernel/idt.o ${BUILD}/x64/kernel/pic.o \
+	${BUILD}/x64/kernel/asm/interrupt.o \
 	${BUILD}/x64/test/test.o
 	ld -b elf64-x86-64 -o $@ $^ -Ttext 0x100000
 

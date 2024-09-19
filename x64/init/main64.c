@@ -4,6 +4,7 @@
 #include "mm.h"
 #include "test/test.h"
 #include "idt.h"
+#include "pic.h"
 
 void main_x64(void)
 {
@@ -13,10 +14,10 @@ void main_x64(void)
 
     phy_memory_init();
 
+    pic_init();
     idt_init();
 
-    test_div_err();
-
+    STI();
     while(1) {
         HLT();
     }
