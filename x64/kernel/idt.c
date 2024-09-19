@@ -7,6 +7,8 @@ static idt_item_t idt_table[256] = {0};
 static idtr_data_t idtr_data;
 
 extern void clock_handler_entry(void);
+extern void keyboard_handler_entry(void);
+
 void clock_interrupt_handler(void)
 {
     printk("*");
@@ -53,6 +55,7 @@ void idt_init(void)
     }
 
     install_idt_item(0x20, &clock_handler_entry, 0x18, 0, 0);
+    install_idt_item(0x21, &keyboard_handler_entry, 0x18, 0, 0);
 
     idtr_data.limit = sizeof(idt_table);
     idtr_data.base = (int64)&idt_table;

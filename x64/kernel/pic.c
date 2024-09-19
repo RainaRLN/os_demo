@@ -32,7 +32,7 @@ void init_8259a(void)
     out_byte(0xA1, 0x03);
 
     // 设置主从的 OCW1
-    out_byte(0x21, 0xFE);  // 只接受主片 IRQ0 时钟中断
+    out_byte(0x21, 0xFD);  // 只接受主片 IRQ1 键盘中断
     out_byte(0xA1, 0xFF);  // 屏蔽从片所有中断
 
     return;
