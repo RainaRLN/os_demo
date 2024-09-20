@@ -8,6 +8,7 @@ static idtr_data_t idtr_data;
 
 extern void clock_handler_entry(void);
 extern void keyboard_handler_entry(void);
+extern int64 interrupt_handler_table[32];
 
 void clock_interrupt_handler(void)
 {
@@ -48,7 +49,11 @@ void idt_init(void)
 {
     int64 handler = (int64)general_interrupt_handler;
 
-    for (int i = 0; i < 256; ++i) {
+    for (int i = 0; i < 0x20; ++i) {
+        install_idt_item(i, interrupt_handler_table[i], 0x18, 0, 0);
+    }
+
+    for (int i = 0x20; i < 256; ++i) {
         // selector = (3 << 3)  // gdt[3] x64_code_descriptor
         // ist = 0;  // 不启用中断栈表
         install_idt_item(i, handler, 0x18, 0, 0);

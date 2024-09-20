@@ -17,6 +17,10 @@ void main_x64(void)
     pic_init();
     idt_init();
 
+    // test_div_err();
+    // test_pf_err();
+    test_int1f();
+
     STI();
     while(1) {
         HLT();
