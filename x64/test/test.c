@@ -40,6 +40,13 @@ void test_vm_manage(void)
     printk("p1 0x%8x\n", p1);
 }
 
+void test_pf_err(void)
+{
+    int *p = (int *)0xdeadbeef;
+    *p = 1;
+    return;
+}
+
 void test_div_err(void)
 {
     int i = 10 / 0;
