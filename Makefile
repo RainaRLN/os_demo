@@ -40,7 +40,8 @@ ${BUILD}/x64/system.bin: ${BUILD}/x64/kernel.bin
 ${BUILD}/x64/kernel.bin: ${BUILD}/x64/boot/head.o ${BUILD}/x64/init/main64.o \
 	${BUILD}/x64/kernel/asm/printk.o ${BUILD}/x64/kernel/printk.o ${BUILD}/x64/kernel/vsprintf.o \
 	${BUILD}/x64/kernel/chr_drv/console.o ${BUILD}/x64/kernel/asm/io.o \
-	${BUILD}/x64/lib/string.o
+	${BUILD}/x64/lib/string.o \
+	${BUILD}/x64/kernel/e820.o
 	ld -b elf64-x86-64 -o $@ $^ -Ttext 0x100000
 
 ${BUILD}/x64/boot/%.o: x64/boot/%.asm
@@ -117,7 +118,7 @@ qemug: all
 
 qemu: all
 	qemu-system-x86_64 \
-	-m 32M \
+	-m 8G \
 	-boot d \
 	-hda ./build/hd.img
 
