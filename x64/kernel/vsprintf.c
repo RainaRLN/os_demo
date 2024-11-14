@@ -1,13 +1,20 @@
 #include "linux/kernel.h"
 
-static char *number(char *str, int num, char type)
+static char *number(char *str, long long num, char type, int fill_zero)
 {
-
+#define LEN 36
     char *p;
-    char tmp_buf[36];
-    unsigned int n;
+    char tmp_buf[LEN];
+    unsigned long long n;
     int base;
-    p = &tmp_buf[35];
+
+    if (fill_zero) {
+        for (int i = 0; i < LEN - 1; ++i) {
+            tmp_buf[i] = '0';
+        }
+    }
+
+    p = &tmp_buf[LEN-1];
     *p = '\0';
     switch (type) {
     case 'd':
@@ -21,11 +28,11 @@ static char *number(char *str, int num, char type)
         break;
     case 'u':
         base = 10;
-        n = (unsigned int)num;
+        n = (unsigned long long)num;
         break;
     case 'x':
         base = 16;
-        n = (unsigned int)num;
+        n = (unsigned long long)num;
         break;
     }
 
@@ -37,9 +44,16 @@ static char *number(char *str, int num, char type)
         } while (n /= base);
     }
 
+    if (fill_zero) {
+        if (p > &tmp_buf[LEN-1-fill_zero]) {
+            p = &tmp_buf[LEN-1-fill_zero];
+        }
+    }
+
     while (*p != '\0') {
         *str++ = *p++;
     }
+#undef LEN
     return str;
 }
 
@@ -47,6 +61,7 @@ int vsprintf(char *buf, const char *fmt, va_list args)
 {
     char *str = buf;
     char *s;
+    int fill_zero = 0;
 
     while (*fmt) {
         if (*fmt != '%') {
@@ -54,6 +69,10 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             continue;
         }
         fmt++;
+
+        while ((*fmt >= '0') && (*fmt <= '9')) {
+            fill_zero = fill_zero * 10 + *(fmt++) - '0';
+        }
 
         switch (*fmt) {
         case 'c':
@@ -67,14 +86,16 @@ int vsprintf(char *buf, const char *fmt, va_list args)
             break;
         case 'd':
         case 'u':
+            fill_zero = 0;
         case 'x':
-            str = number(str, va_arg(args, unsigned int), *fmt);
+            str = number(str, va_arg(args, unsigned long long), *fmt, fill_zero);
             break;
         default:
             *str++ = *fmt;
             break;
         }
         fmt++;
+        fill_zero = 0;
     }
     *str = '\0';
     return str - buf;
