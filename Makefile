@@ -41,7 +41,7 @@ ${BUILD}/x64/kernel.bin: ${BUILD}/x64/boot/head.o ${BUILD}/x64/init/main64.o \
 	${BUILD}/x64/kernel/asm/printk.o ${BUILD}/x64/kernel/printk.o ${BUILD}/x64/kernel/vsprintf.o \
 	${BUILD}/x64/kernel/chr_drv/console.o ${BUILD}/x64/kernel/asm/io.o \
 	${BUILD}/x64/lib/string.o \
-	${BUILD}/x64/kernel/e820.o
+	${BUILD}/x64/kernel/e820.o ${BUILD}/x64/mm/memblock.o
 	ld -b elf64-x86-64 -o $@ $^ -Ttext 0x100000
 
 ${BUILD}/x64/boot/%.o: x64/boot/%.asm
@@ -66,6 +66,10 @@ ${BUILD}/x64/lib/%.o: x64/lib/%.c
 
 ${BUILD}/x64/kernel/chr_drv/%.o: x64/kernel/chr_drv/%.c
 	$(shell mkdir -p ${BUILD}/x64/kernel/chr_drv)
+	gcc ${DEBUG} ${CFLAGS64} -c $< -o $@
+
+${BUILD}/x64/mm/%.o: x64/mm/%.c
+	$(shell mkdir -p ${BUILD}/x64/mm)
 	gcc ${DEBUG} ${CFLAGS64} -c $< -o $@
 
 ${BUILD}/system.bin: ${BUILD}/kernel.bin

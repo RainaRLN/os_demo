@@ -10,7 +10,15 @@ typedef unsigned short u16;
 typedef unsigned int u32;
 typedef unsigned long long u64;
 
+typedef _Bool			bool;
+enum {
+    false = 0,
+    true = 1
+};
+
 typedef unsigned int size_t;
+
+typedef u64 phys_addr_t;
 
 #endif  // _LINUX_TYPES_H_
 
