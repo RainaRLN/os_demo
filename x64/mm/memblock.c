@@ -31,6 +31,280 @@ static inline phys_addr_t memblock_cap_size(phys_addr_t base, phys_addr_t *size)
     return *size = min(*size, PHYS_ADDR_MAX - base);
 }
 
+void __next_mem_range(u64 *idx, int nid,
+                enum memblock_flags flags,
+                struct memblock_type *type_a,
+                struct memblock_type *type_b,
+                phys_addr_t *out_start,
+                phys_addr_t *out_end, int *out_nid)
+{
+    int idx_a = *idx & 0xffffffff;
+    int idx_b = *idx >> 32;
+
+    if (WARN_ONCE(nid == MAX_NUMNODES,
+            "Usage of MAX_NUMNODES is deprecated. Use NUMA_NO_NODE instead\n")) {
+        nid = NUMA_NO_NODE;
+    }
+
+    for (; idx_a < type_a->cnt; idx_a++) {
+        struct memblock_region *m = &type_a->regions[idx_a];
+
+        phys_addr_t m_start = m->base;
+        phys_addr_t m_end = m->base + m->size;
+        int m_nid = m->nid;
+
+        // if (should_skip_region(m, nid, flags))
+        //     continue;
+
+        if (!type_b) {
+            if (out_start)
+                *out_start = m_start;
+            if (out_end)
+                *out_end = m_end;
+            if (out_nid)
+                *out_nid = m_nid;
+            idx_a++;
+            *idx = (u32)idx_a | (u64)idx_b << 32;
+            return;
+        }
+
+        for (; idx_b < type_b->cnt + 1; idx_b++) {
+            struct memblock_region *r;
+            phys_addr_t r_start;
+            phys_addr_t r_end;
+
+            r = &type_b->regions[idx_b];
+            r_start = idx_b ? r[-1].base + r[-1].size : 0;
+            r_end = idx_b < type_b->cnt ? r->base : PHYS_ADDR_MAX;
+
+            if (r_start >= m_end)
+                break;
+
+            if (m_start < r_end) {
+                if (out_start)
+                    *out_start = max(m_start, r_start);
+                if (out_end)
+                    *out_end = min(m_end, r_end);
+                if (out_nid)
+                    *out_nid = m_nid;
+                if (m_end <= r_end)
+                    idx_a++;
+                else
+                    idx_b++;
+                *idx = (u32)idx_a | (u64)idx_b << 32;
+                return;
+            }
+        }
+    }
+
+    *idx = ULLONG_MAX;
+    return;
+}
+
+// Finds the next range from type_a which is not marked as unsuitable in type_b
+void __next_mem_range_rev(u64 *idx, int nid,
+                enum memblock_flags flags,
+                struct memblock_type *type_a,
+                struct memblock_type *type_b,
+                phys_addr_t *out_start,
+                phys_addr_t *out_end, int *out_nid)
+{
+    int idx_a = *idx & 0xffffffff;  // 低 32 bit 记录 type_a 的 idx
+    int idx_b = *idx >> 32;  // 高 32 bit 记录 type_b 的 idx
+
+    if (WARN_ONCE(nid == MAX_NUMNODES,
+            "Usage of MAX_NUMNODES is deprecated, Use NUMA_NO_NODE instead\n")) {
+        nid = NUMA_NO_NODE;
+    }
+
+    if (*idx == (u64)ULLONG_MAX) {
+        idx_a = type_a->cnt - 1;
+        if (type_b != NULL)
+            idx_b = type_b->cnt;
+        else
+            idx_b = 0;
+    }
+
+    for (; idx_a >= 0; idx_a--) {
+        struct memblock_region *m = &type_a->regions[idx_a];
+
+        phys_addr_t m_start = m->base;
+        phys_addr_t m_end = m->base + m->size;
+        int m_nid = m->nid;
+
+        // if (should_skip_region(m, nid, flags))
+        //     continue;
+
+        if (!type_b) {
+            if (out_start)
+                *out_start = m_start;
+            if (out_end)
+                *out_end = m_end;
+            if (out_nid)
+                *out_nid = m_nid;
+            idx_a--;
+            *idx = (u32)idx_a | (u64)idx_b << 32;
+            return;
+        }
+
+        /* 取 type_b 的补集 r (去除 type_b 的可用空间)
+         * 比如 type_b 如下:
+         * [0-16), [32-48), [128-130)
+         * 遍历的 r 为
+         * [0-0), [16-32), [48-128), [130-MAX)
+         */
+        for (; idx_b >= 0; idx_b--) {
+            struct memblock_region *r;
+            phys_addr_t r_start;
+            phys_addr_t r_end;
+
+            r = &type_b->regions[idx_b];
+            // r_start = 上一个 region 的 end
+            r_start = idx_b ? r[-1].base + r[-1].size : 0;
+            // r_end = 当前 region 的 start
+            r_end = idx_b < type_b->cnt ? r->base : PHYS_ADDR_MAX;
+
+            // 可用空间在 m_start 前面，break， 取上一个 m
+            if (r_end <= m_start) {
+                break;
+            }
+            // r 和 m 有交集，取交集
+            if (m_end > r_start) {
+                if (out_start)
+                    *out_start = max(m_start, r_start);
+                if (out_end)
+                    *out_end = min(m_end, r_end);
+                if (out_nid)
+                    *out_nid = m_nid;
+                if (m_start >= r_start)
+                    idx_a--;  // 下次遍历上一个 m
+                else
+                    idx_b--;  // 下次从上一个 r 开始遍历
+                // 记录 m 和 r 的 idx，供下一轮遍历使用
+                *idx = (u32)idx_a | (u64)idx_b << 32;
+                return;
+            }
+        }
+    }
+
+    // 遍历结束标志
+    *idx = ULLONG_MAX;
+    return;
+}
+
+static phys_addr_t __memblock_find_range_bottom_up(phys_addr_t start, phys_addr_t end,
+                        phys_addr_t size, phys_addr_t align, int nid,
+                        enum memblock_flags flags)
+{
+    phys_addr_t this_start, this_end, cand;
+    u64 i;
+
+    for_each_free_mem_range(i, nid, flags, &this_start, &this_end, NULL) {
+        this_start = clamp(this_start, start, end);
+        this_end = clamp(this_end, start, end);
+
+        // 头部分配，起始地址按 align 向高地址对齐, 返回起始地址
+        cand = round_up(this_start, align);
+        if (cand < this_end && this_end - cand >= size) {
+            return cand;
+        }
+    }
+
+}
+
+static phys_addr_t __memblock_find_range_top_down(phys_addr_t start, phys_addr_t end,
+                        phys_addr_t size, phys_addr_t align, int nid,
+                        enum memblock_flags flags)
+{
+    phys_addr_t this_start, this_end, cand;
+    u64 i;
+
+/*
+ *  for (i = (u64)ULLONG_MAX, __next_mem_range_rev(&i, nid, flags, &memblock.memory,
+ *              &memblock.reserved, &this_start, &this_end, NULL);
+ *          i != (u64)ULLONG_MAX;
+ *          __next_mem_range_rev(&i, nid, flags, &memblock.memory, &memblock.reserved,
+ *              &this_start, &this_end, NULL)) {
+ */
+    for_each_free_mem_range_reverse(i, nid, flags, &this_start, &this_end, NULL) {
+        // 取 [this_start, this_end] [start, end] 的交集
+        // 若无交集, 收缩为 start 或 end
+        this_start = clamp(this_start, start, end);
+        this_end = clamp(this_end, start, end);
+
+        // 避免 round_down 出错, 保证 this_end - size 非负
+        if (this_end < size) {
+            continue;
+        }
+
+        // 尾部分配，起始地址按 align 向低地址对齐, 返回起始地址
+        cand = round_down(this_end - size, align);
+        // 满足条件，返回
+        if (cand >= this_start) {
+            return cand;
+        }
+    }
+
+    // 分配失败
+    return 0;
+}
+
+static phys_addr_t memblock_find_in_range_node(phys_addr_t size,
+                    phys_addr_t align, phys_addr_t start,
+                    phys_addr_t end, int nid,
+                    enum memblock_flags flags)
+{
+    if (end == MEMBLOCK_ALLOC_ACCESSIBLE) {
+        end = memblock.current_limit;
+    }
+
+    // 避免分配第一个页
+    // 0 地址用来表示分配失败
+    start = max_t(phys_addr_t, start, PAGE_SIZE);
+    end = max(start, end);
+
+    if (memblock.bottom_up) {
+        return __memblock_find_range_bottom_up(start, end, size, align,
+                                nid, flags);
+    } else {
+        return __memblock_find_range_top_down(start, end, size, align,
+                                nid, flags);
+    }
+}
+
+phys_addr_t memblock_alloc_range_nid(phys_addr_t size,
+                    phys_addr_t align, phys_addr_t start,
+                    phys_addr_t end, int nid)
+{
+    enum memblock_flags flags = MEMBLOCK_NONE;
+    phys_addr_t found;
+
+    // 在特定 NODE 分配
+    found = memblock_find_in_range_node(size, align, start, end, nid,
+                        flags);
+    if (found && !memblock_reserve(found, size))
+        return found;
+
+    // 尝试所有 NODE 去分配
+    if (nid != NUMA_NO_NODE) {
+        found = memblock_find_in_range_node(size, align, start,
+                            end, NUMA_NO_NODE,
+                            flags);
+        if (found && !memblock_reserve(found, size))
+            return found;
+    }
+
+    return 0;
+}
+
+phys_addr_t memblock_phys_alloc_range(phys_addr_t size,
+                        phys_addr_t align,
+                        phys_addr_t start,
+                        phys_addr_t end)
+{
+    return memblock_alloc_range_nid(size, align, start, end, NUMA_NO_NODE);
+}
+
 static void memblock_merge_regions(struct memblock_type *type)
 {
     int i = 0;
@@ -169,6 +443,14 @@ repeat:
         memblock_merge_regions(type);
         return 0;
     }
+}
+
+int memblock_reserve(phys_addr_t base, phys_addr_t size)
+{
+    phys_addr_t end = base + size - 1;
+    printk("memblock_reserve: [0x%16x-0x%16x] size 0x%16x\n", base, end, size);
+
+    return memblock_add_range(&memblock.reserved, base, size, MAX_NUMNODES, MEMBLOCK_NONE);
 }
 
 int memblock_add(phys_addr_t base, phys_addr_t size)

@@ -22,6 +22,13 @@
 
 #define BUG_ON(condition) do { if (condition) BUG(condition); } while(0)
 
+#define WARN_ONCE(condition, format...) ({ \
+    int __ret_warn_once = !!(condition); \
+    if (__ret_warn_once) \
+        printk(format); \
+    (__ret_warn_once); \
+})
+
 int vsprintf(char *buf, const char *fmt, va_list args);
 int printk(const char *fmt, ...);
 
