@@ -1,6 +1,7 @@
 #include "linux/kernel.h"
 #include "asm/e820.h"
 #include "string.h"
+#include "linux/memblock.h"
 
 #define E820_ARDS_NUM_ADDR (0x7e00)
 
@@ -50,6 +51,24 @@ void e820__memory_setup(void)
 {
     memcpy(e820_table, (void *)E820_ARDS_NUM_ADDR, sizeof(struct e820_table));
     e820__print_table();
+
+    return;
+}
+
+void e820__memblock_setup(void)
+{
+    for (int i = 0; i < e820_table->nr_entries; ++i) {
+        struct e820_entry *entry = &e820_table->entries[i];
+
+        if (entry->type != E820_TYPE_RAM && entry->type != E820_TYPE_RESERVED_KERN) {
+            // 非 usable 内存段，跳过
+            continue;
+        }
+
+        memblock_add(entry->addr, entry->size);
+    }
+
+    memblock_dump_all();
 
     return;
 }

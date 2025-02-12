@@ -20,5 +20,8 @@ typedef unsigned int size_t;
 
 typedef u64 phys_addr_t;
 
+#define max(x, y) ((x) > (y) ? (x) : (y))
+#define min(x, y) ((x) < (y) ? (x) : (y))
+
 #endif  // _LINUX_TYPES_H_
 

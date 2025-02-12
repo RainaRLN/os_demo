@@ -39,5 +39,8 @@ struct memblock {
     struct memblock_type reserved;  // 不可用的内存区域
 };
 
+int memblock_add(phys_addr_t base, phys_addr_t size);
+void memblock_dump_all(void);
+
 #endif  // _LINUX_MEMBLOCK_H_
 

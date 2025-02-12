@@ -51,6 +51,6 @@ struct e820_table {
 };
 
 void e820__memory_setup(void);
-
+void e820__memblock_setup(void);
 #endif  // _ASM_E820_H_
 
