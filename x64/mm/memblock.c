@@ -305,6 +305,26 @@ phys_addr_t memblock_phys_alloc_range(phys_addr_t size,
     return memblock_alloc_range_nid(size, align, start, end, NUMA_NO_NODE);
 }
 
+static void memblock_remove_region(struct memblock_type *type, unsigned long r)
+{
+    type->total_size -= type->regions[r].size;
+    memmove(&type->regions[r], &type->regions[r + 1],
+        (type->cnt - (r + 1)) * sizeof(type->regions[r]));
+    type->cnt--;
+
+    // 空数组，把 cnt 置 1, regions[0].size 清 0
+    if (type->cnt == 0) {
+        WARN_ON(type->total_size != 0);
+        type->cnt = 1;
+        type->regions[0].base = 0;
+        type->regions[0].size = 0;
+        type->regions[0].flags = 0;
+        type->regions[0].nid = MAX_NUMNODES;
+    }
+
+    return;
+}
+
 static void memblock_merge_regions(struct memblock_type *type)
 {
     int i = 0;
@@ -459,6 +479,97 @@ int memblock_add(phys_addr_t base, phys_addr_t size)
     printk("memblock_add: [0x%16x-0x%16x] size 0x%16x\n", base, end, size);
 
     return memblock_add_range(&memblock.memory, base, size, MAX_NUMNODES, MEMBLOCK_NONE);
+}
+
+/*
+ * 拆分 [base, end) 所在 regions
+ * 可能是在一个 region 内: [rbase, rend) -> [rbase, base) [base, end) [end, rend)
+ * 可能涉及多个 regions: [rbase, rend) ... [rbasen, rendn) ->  [rbase, base) ... [end, rend)
+ */
+static int memblock_isolate_range(struct memblock_type *type,
+                phys_addr_t base, phys_addr_t size,
+                int *start_rgn, int *end_rgn)
+{
+    phys_addr_t end = base + memblock_cap_size(base, &size);
+    int idx;
+    struct memblock_region *rgn;
+
+    *start_rgn = *end_rgn = 0;
+
+    if (!size)
+        return 0;
+
+    // 最多会多出两块区域
+    // while (type->cnt + 2 > type->max) {
+    //     if (memblock_double_array(type, base, size) < 0)
+    //         return -ENOMEM;
+    // }
+
+    for (idx = 0, rgn = &type->regions[0]; idx < type->cnt; idx++, rgn = &type->regions[idx]) {
+        phys_addr_t rbase = rgn->base;
+        phys_addr_t rend = rbase + rgn->size;
+
+        if (rbase >= end)
+            break;  // 要释放的区域在前面，拆完了，退出
+        if (rend <= base)
+            continue;  // 要释放的区域在后面，继续
+
+        // 找到了有交集的 region
+        if (rbase < base) {  // 拆出前面不释放区域 [rbase, base)
+            // 当前 rgn 扣除前面不释放区域, 即 [rbase, rend) -> [base, rend)
+            rgn->base = base;
+            rgn->size -= base - rbase;
+            type->total_size -= base - rbase;
+            // 至此 type 去除了前面不释放的区域 [rbase, base)
+
+            // [rbase, base) 作为单独 region 再插进去
+            // 插到当前 idx, [base, rend) 会 move 到 idx+1 位置，供下次循环遍历
+            memblock_insert_region(type, idx, rbase, base - rbase,
+                                rgn->nid, rgn->flags);
+        } else if (rend > end) {  // 拆出后面不释放区域
+            // 当前 rgn 扣除要释放区域，更新为后面不释放的区域
+            // [rbasen, rendn) - [base, end) -> [end, rendn)  // rbasen >= base
+            rgn->base = end;
+            rgn->size -= end - rbase;
+            type->total_size -= end - rbase;
+            // 把要释放的区域 [rbasen, end) 作为单独 region 插回去
+            memblock_insert_region(type, idx--, rbase, end - rbase,
+                                rgn->nid, rgn->flags);
+        } else {  // 要释放区域包含当前整个 rgn
+            // 将当前 idx 加入 [start_idx, end_idx)
+            if (!*end_rgn) {
+                *start_rgn = idx;
+            }
+            *end_rgn = idx + 1;
+        }
+    }
+
+    return 0;
+}
+
+static int memblock_remove_range(struct memblock_type *type,
+                phys_addr_t base, phys_addr_t size)
+{
+    int start_rgn, end_rgn;
+    int i, ret;
+
+    ret = memblock_isolate_range(type, base, size, &start_rgn, &end_rgn);
+    if (ret)
+        return ret;
+
+    // 从后往前删除 regions
+    for (i = end_rgn - 1; i >= start_rgn; i--) {
+        memblock_remove_region(type, i);
+    }
+    return 0;
+}
+
+int memblock_free(phys_addr_t base, phys_addr_t size)
+{
+    phys_addr_t end = base + size - 1;
+    printk("memblock_free: [0x%16x-0x%16x] size 0x%16x\n", base, end, size);
+
+    return memblock_remove_range(&memblock.reserved, base, size);
 }
 
 static void memblock_dump(struct memblock_type *type)

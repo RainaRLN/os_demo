@@ -39,5 +39,9 @@ void test_memblock(void)
 
     memblock_dump_all();
 
+    memblock_free(alloc[1] + 0x200, 0x1000);
+    memblock_free(alloc[3], 0x1000);
+    memblock_dump_all();
+
     return;
 }

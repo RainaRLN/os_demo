@@ -74,5 +74,7 @@ void memblock_dump_all(void);
 phys_addr_t memblock_phys_alloc_range(phys_addr_t size, phys_addr_t align,
                         phys_addr_t start, phys_addr_t end);
 
+int memblock_free(phys_addr_t base, phys_addr_t size);
+
 #endif  // _LINUX_MEMBLOCK_H_
 
