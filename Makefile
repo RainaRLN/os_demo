@@ -44,7 +44,9 @@ ${BUILD}/x64/kernel.bin: ${BUILD}/x64/boot/head.o ${BUILD}/x64/init/main64.o \
 	${BUILD}/x64/mm/malloc.o ${BUILD}/x64/kernel/idt.o ${BUILD}/x64/kernel/pic.o \
 	${BUILD}/x64/kernel/asm/interrupt.o ${BUILD}/x64/kernel/chr_drv/keyboard.o \
 	${BUILD}/x64/kernel/exception.o \
-	${BUILD}/x64/test/test.o ${BUILD}/x64/test/asm_test.o
+	${BUILD}/x64/test/test.o ${BUILD}/x64/test/asm_test.o \
+	${BUILD}/x64/kernel/e820.o ${BUILD}/x64/mm/memblock.o \
+	${BUILD}/x64/test/memblock.o
 	ld -b elf64-x86-64 -o $@ $^ -Ttext 0x100000
 
 ${BUILD}/x64/boot/%.o: x64/boot/%.asm

@@ -4,9 +4,9 @@
 KERNEL_ADDR equ 0x1200
 X64_KERNEL_ADDR equ 0x100000
 
-E820_ARDS_NUM dw 0
-E820_ARDS_NUM_ADDR equ 0x7e00
-E820_ARDS_ADDR equ 0x7e02
+E820_ARDS_NUM dw 0  ; 记录 ARDS 个数
+E820_ARDS_NUM_ADDR equ 0x7e00  ; ARDS 个数存放地址
+E820_ARDS_ADDR equ 0x7e02  ; ARDS 数组存放地址
 
 SEG_BASE equ 0
 SEG_LIMIT equ 0xfffff
@@ -66,32 +66,32 @@ _start:
     mov fs, ax
     mov gs, ax
 
-get_mem_map:
-    xor ebx, ebx
-    mov di, E820_ARDS_ADDR
+detect_memory_e820:
+    xor ebx, ebx  ; 第一次调用时要清零
+    mov di, E820_ARDS_ADDR  ; ARDS 缓冲区起始地址
 .next:
     mov eax, 0xe820  ; 子功能号
-    mov ecx, 20  ; ARDS 结构体大小
-    mov edx, 0x534d4150  ; MAGIC
-    int 0x15  ; BIOS 中断号
+    mov ecx, 20  ; ARDS 缓冲区大小
+    mov edx, 0x534d4150  ; SMAP 固定签名标记
+    int 0x15  ; 调用 BIOS INT 15H 中断
 
-    jc .get_map_err  ; CF = 1, 出错
+    jc .detect_mem_err  ; CF = 1，出错
 
-    inc dword [E820_ARDS_NUM]  ; 记录结构体数量
-    add di, cx  ; 下一个填充位置
+    inc dword [E820_ARDS_NUM]  ; ARDS 个数加一
+    add di, cx  ; 下一个 ARDS 缓冲区
 
-    cmp ebx, 0  ; ebx == 0, 表示是最后一个 ARDS 结构体，退出
-    jne .next  ; 继续下一个
+    cmp ebx, 0  ; ebx == 0，表示是最后一个 ARDS，退出
+    jne .next  ; 继续获取下一个 ARDS
 
     mov ax, [E820_ARDS_NUM]
-    mov [E820_ARDS_NUM_ADDR], ax  ; 保存结构体总数
+    mov [E820_ARDS_NUM_ADDR], ax  ; 保存 ARDS 个数
 
-    mov si, msg_get_mem_map_ok
+    mov si, msg_detect_mem_ok
     call print
     jmp enter_protected_mode
 
-.get_map_err:
-    mov si, msg_get_mem_map_err
+.detect_mem_err:
+    mov si, msg_detect_mem_err
     call print
     jmp $
 
@@ -244,9 +244,10 @@ read_hd:
     loop .readw
     ret
 
+msg_detect_mem_ok:
+    db "Query memory map ok.", 10, 13, 0
+msg_detect_mem_err:
+    db "Query memory map failed.", 10, 13, 0
 msg_prepare_protected:
     db "Prepare to go into protected mode ...", 10, 13, 0  ; \n \r \0
-msg_get_mem_map_ok:
-    db "Query memory map ok.", 10, 13, 0
-msg_get_mem_map_err:
-    db "Query memory map failed.", 10, 13, 0
+

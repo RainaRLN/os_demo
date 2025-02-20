@@ -46,3 +46,22 @@ void *memcpy(void *dest, const void *src, size_t n)
     return dest;
 }
 
+void *memmove(void *dest, const void *src, size_t n)
+{
+    unsigned char *d = dest;
+    const unsigned char *s = src;
+
+    // d 在 s 前面 || d 在 s+n 后面，没有重叠
+    // 直接从前往后复制
+    if (d <= s || d >= s + n) {
+        while (n-- > 0) {
+            *d++ = *s++;
+        }
+    } else {  // 从后往前复制
+        while (n-- > 0)
+            d[n] = s[n];
+    }
+
+    return dest;
+}
+
